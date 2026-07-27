@@ -142,11 +142,11 @@ async def send_email_notify(results):
     """
     smtp_host = os.getenv("SMTP_HOST", "").strip()
     smtp_port = int(os.getenv("SMTP_PORT", "465") or "465")
-    smtp_ssl = os.getenv("SMTP_SSL", "true").strip().lower() in ("true", "1", "yes")
+    smtp_ssl = (os.getenv("SMTP_SSL") or "true").strip().lower() in ("true", "1", "yes")
     username = os.getenv("SMTP_USERNAME", "").strip()
     password = os.getenv("SMTP_PASSWORD", "").strip()
-    from_addr = os.getenv("SMTP_FROM", username).strip()
-    from_name = os.getenv("SMTP_FROM_NAME", "TG 签到助手").strip()
+    from_addr = (os.getenv("SMTP_FROM") or username).strip()
+    from_name = (os.getenv("SMTP_FROM_NAME") or "TG 签到助手").strip()
     to_raw = os.getenv("EMAIL_TO", "").strip()
 
     # 参数校验
