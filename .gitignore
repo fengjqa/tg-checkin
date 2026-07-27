@@ -1,0 +1,29 @@
+# 敏感信息（切勿提交）
+.env
+*.session
+*.session-journal
+*.session-shm
+*.session-wal
+
+# 运行日志
+checkin.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 截图等临时文件
+Snipaste_*.png
+*.png
+
+# IDE / 工具配置（不应提交）
+.catpaw/
+.vscode/
+.idea/
+
+# 如果不希望机器人列表公开，取消下面这行的注释
+# config.yaml

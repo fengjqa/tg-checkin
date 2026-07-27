@@ -1,0 +1,62 @@
+# Telegram 机器人签到配置
+# 复制本文件为 config.yaml 后修改
+#
+# 每个机器人支持的字段：
+#   name:         显示名称（仅用于日志，方便区分）
+#   username:     机器人用户名（不带 @）
+#   command:      签到命令，默认 /checkin
+#   click_button: 可选，签到后需要点击的按钮文字（模糊匹配）
+#   solve_math:   可选，设为 true 时自动解答机器人弹出的数学验证题
+#                 （支持 + - × ÷ 加减乘除，自动计算并点击正确答案按钮）
+#   solve_image:  可选，设为 true 时自动识别机器人弹出的图片验证码
+#                 （需配置 GEMINI_API_KEY 或 OPENAI_API_KEY 环境变量）
+#   ai_provider:  可选，AI 提供商：gemini（默认）或 openai
+#   ai_model:     可选，指定模型名，覆盖默认值
+#                 Gemini 可选: gemini-2.0-flash（默认）, gemini-2.5-flash, gemini-1.5-pro 等
+#                 OpenAI 可选: gpt-4o-mini（默认）, gpt-4o, gpt-4.1-mini 等
+#   timeout:      等待机器人回复的超时秒数，默认 30
+#   delay:        发送命令前的延迟秒数，默认 2（避免发太快触发限流）
+#   debug:        可选，设为 true 时输出机器人回复中的所有按钮文字，方便确认配置
+#   wait_final:   可选，设为 true 时在未收到引用回复的情况下，继续等待任意第二条消息
+#                 （通常不需要，脚本会自动检测引用签到命令的回复消息）
+
+
+
+bots:
+  # 最简单的：只需发一条命令
+  - name: "影巢"
+    username: "HDHiveBot"
+    command: "/checkin"
+
+  # 需要先发命令，再点击回复消息中的按钮
+  - name: "MICU Cloud Media"
+    username: "micu_user_bot"
+    command: "/start"
+    click_button: "签到"
+    solve_math: true
+    timeout: 30
+    delay: 3
+    debug: true
+
+  #命令带参数或使用其他命令名
+  - name: "玄武"
+    username: "qingbaobu"
+    command: "/sign"
+
+  # 需要先发命令，再点击回复消息中的按钮
+  - name: "佬友记"
+    username: "laoyou_bot"
+    command: "/start"
+    click_button: "✅ 每日签到"
+    timeout: 30
+    delay: 3
+    debug: false
+
+  - name: "厂妹"
+    username: "EmbyPublicBot"
+    command: "/checkin"
+    solve_image: true
+    ai_provider: gemini
+    timeout: 30
+    delay: 3
+    debug: false  # ← 开启详细日志，方便排查问题

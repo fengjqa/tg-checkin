@@ -1,0 +1,9 @@
+telethon>=1.36.0
+pyyaml>=6.0
+python-dotenv>=1.0.1
+python-socks[asyncio]>=2.4
+qrcode>=7.4
+aiohttp>=3.9
+aiosmtplib>=3.3.0
+markdown>=3.7
+rich>=15.0.0

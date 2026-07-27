@@ -1,0 +1,80 @@
+name: TG Checkin
+
+on:
+  schedule:
+    # 每天 UTC 00:00 执行（即北京时间 08:00）
+    # GitHub Actions 的 cron 用 UTC 时间，且可能延迟几分钟，属正常现象
+    # 如需调整时间，修改下面这行。例如北京时间 09:00 = UTC 01:00
+    - cron: "0 0 * * *"
+  # 支持手动触发，方便测试
+  workflow_dispatch: {}
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # 如果在仓库 Secret 中配置了 CONFIG_YAML，则用它覆盖 config.yaml
+      # 这样可以把机器人列表也作为保密内容，不提交到仓库
+      - name: Write config from secret (optional)
+        env:
+          CONFIG_YAML: ${{ secrets.CONFIG_YAML }}
+        run: |
+          if [ -n "$CONFIG_YAML" ]; then
+            printf '%s\n' "$CONFIG_YAML" > config.yaml
+            echo "已从 Secret 写入 config.yaml"
+          else
+            echo "未配置 CONFIG_YAML，使用仓库中的 config.yaml"
+          fi
+
+      - name: Run checkin
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+          NOTIFY_CHAT_ID: ${{ secrets.NOTIFY_CHAT_ID }}
+          NOTIFY_MAX_LENGTH: ${{ secrets.NOTIFY_MAX_LENGTH }}
+          # 图片验证码识别（可选，遇到图片验证码时需要）
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          # 可选：代理配置（GitHub Actions 服务器通常可直连 TG，一般无需配置）
+          PROXY_TYPE: ${{ secrets.PROXY_TYPE }}
+          PROXY_HOST: ${{ secrets.PROXY_HOST }}
+          PROXY_PORT: ${{ secrets.PROXY_PORT }}
+          PROXY_USERNAME: ${{ secrets.PROXY_USERNAME }}
+          PROXY_PASSWORD: ${{ secrets.PROXY_PASSWORD }}
+          # 可选：邮件通知
+          EMAIL_ENABLED: ${{ secrets.EMAIL_ENABLED }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SSL: ${{ secrets.SMTP_SSL }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          SMTP_FROM_NAME: ${{ secrets.SMTP_FROM_NAME }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: python checkin.py
+
+      # 无论成功失败都上传日志，方便排查
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkin-log
+          path: checkin.log
+          retention-days: 7
