@@ -2,10 +2,11 @@ name: TG Checkin
 
 on:
   schedule:
-    # 每天 UTC 00:00 执行（即北京时间 08:00）
+    # 每天 UTC 00:17 执行（即北京时间 08:17）
+    # 避开整点高负载时段，GitHub Actions 在每小时的开始时负载最高
     # GitHub Actions 的 cron 用 UTC 时间，且可能延迟几分钟，属正常现象
     # 如需调整时间，修改下面这行。例如北京时间 09:00 = UTC 01:00
-    - cron: "0 0 * * *"
+    - cron: "17 0 * * *"
   # 支持手动触发，方便测试
   workflow_dispatch: {}
 
