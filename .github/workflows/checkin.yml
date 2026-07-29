@@ -6,7 +6,7 @@ on:
     # 避开整点高负载时段，GitHub Actions 在每小时的开始时负载最高
     # GitHub Actions 的 cron 用 UTC 时间，且可能延迟几分钟，属正常现象
     # 如需调整时间，修改下面这行。例如北京时间 09:00 = UTC 01:00
-    - cron: "17 1 * * *"
+    - cron: '17 */8 * * *'
   # 支持手动触发，方便测试
   workflow_dispatch: {}
 
