@@ -224,6 +224,14 @@ async def _solve_with_gemini(image_b64, mime_type, options, model=None, debug=Fa
     if debug:
         logger.info("[image_solver] Gemini Prompt:\n%s", prompt)
 
+    # Gemini 安全过滤设置：将所有类别设为 BLOCK_NONE，避免验证码图片被误拦截
+    safety_settings = [
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    ]
+
     payload = {
         "contents": [{
             "parts": [
@@ -235,6 +243,7 @@ async def _solve_with_gemini(image_b64, mime_type, options, model=None, debug=Fa
             "temperature": 0.1,
             "maxOutputTokens": 100,
         },
+        "safetySettings": safety_settings,
     }
 
     proxy_url = _get_proxy_url()
@@ -270,13 +279,24 @@ async def _solve_with_gemini(image_b64, mime_type, options, model=None, debug=Fa
                 candidates = data.get("candidates", [])
                 if not candidates:
                     logger.error("\u274c Gemini API 未返回 candidates")
+                    prompt_feedback = data.get("promptFeedback", {})
+                    if prompt_feedback:
+                        logger.error(
+                            "\u274c promptFeedback: %s",
+                            prompt_feedback.get("blockReason", "unknown"),
+                        )
                     if debug:
                         logger.debug("[image_solver] 完整响应: %s", data)
                     return None
 
+                # 检查 finishReason，诊断为何 content.parts 为空
+                finish_reason = candidates[0].get("finishReason", "")
                 parts = candidates[0].get("content", {}).get("parts", [])
                 if not parts:
-                    logger.error("\u274c Gemini API 返回 content.parts 为空")
+                    logger.error(
+                        "\u274c Gemini API 返回 content.parts 为空 (finishReason=%s)",
+                        finish_reason or "unknown",
+                    )
                     if debug:
                         logger.debug("[image_solver] candidate: %s", candidates[0])
                     return None
