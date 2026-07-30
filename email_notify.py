@@ -29,6 +29,7 @@ import os
 import re
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 
 import markdown as md_lib
 
@@ -172,7 +173,7 @@ async def send_email_notify(results):
     subject = f"TG 签到结果 {success_count}/{total}"
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = f"{from_name} <{from_addr}>"
+    msg["From"] = formataddr((from_name, from_addr))
     msg["To"] = ", ".join(to_addrs)
 
     plain_text = _build_summary_plain(results)
