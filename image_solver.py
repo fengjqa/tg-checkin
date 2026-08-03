@@ -35,6 +35,39 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
+def _is_thinking_model(model_name):
+    """判断模型是否为思考型（Gemini 2.5+ / 3.x）
+
+    思考型模型会将内部推理 token 计入 maxOutputTokens 预算，
+    若 maxOutputTokens 过小，模型会把所有 token 用于"思考"，
+    导致 content.parts 为空、finishReason=MAX_TOKENS。
+    """
+    m = re.match(r"gemini-(\d+)", model_name)
+    if m:
+        major = int(m.group(1))
+        if major >= 3:
+            return True
+    if "2.5" in model_name:
+        return True
+    return False
+
+
+def _build_thinking_config(model_name):
+    """根据模型版本构建 thinkingConfig，禁用/最小化思考
+
+    - Gemini 2.5: thinkingBudget=0（完全禁用思考）
+    - Gemini 3+:  thinkingLevel="MINIMAL"（最低思考档位）
+    """
+    m = re.match(r"gemini-(\d+)", model_name)
+    if m:
+        major = int(m.group(1))
+        if major >= 3:
+            # Gemini 3+ 使用 thinkingLevel
+            return {"thinkingLevel": "MINIMAL"}
+    # Gemini 2.5 使用 thinkingBudget（0 = 完全禁用）
+    return {"thinkingBudget": 0}
+
+
 def _get_proxy_url():
     """根据环境变量构建代理 URL，无代理时返回 None"""
     host = os.getenv("PROXY_HOST", "").strip()
@@ -232,6 +265,22 @@ async def _solve_with_gemini(image_b64, mime_type, options, model=None, debug=Fa
         {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
     ]
 
+    generation_config = {
+        "temperature": 0.1,
+        "maxOutputTokens": 2048,
+    }
+
+    # 思考型模型（Gemini 2.5+ / 3.x）会消耗大量内部推理 token，
+    # 导致实际输出为空。此处禁用/最小化思考，图片识别无需复杂推理。
+    if _is_thinking_model(model_name):
+        thinking_config = _build_thinking_config(model_name)
+        generation_config["thinkingConfig"] = thinking_config
+        if debug:
+            logger.info(
+                "[image_solver] 检测到思考型模型 %s，已设置 thinkingConfig=%s",
+                model_name, thinking_config,
+            )
+
     payload = {
         "contents": [{
             "parts": [
@@ -239,10 +288,7 @@ async def _solve_with_gemini(image_b64, mime_type, options, model=None, debug=Fa
                 {"inline_data": {"mime_type": mime_type, "data": image_b64}},
             ]
         }],
-        "generationConfig": {
-            "temperature": 0.1,
-            "maxOutputTokens": 100,
-        },
+        "generationConfig": generation_config,
         "safetySettings": safety_settings,
     }
 
