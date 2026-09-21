@@ -30,7 +30,7 @@ bots:
 
   - name: "癫影"
     username: "dianyingbalala_bot"
-    command: "/qd"
+    command: "/lqd"
     
   # 需要先发命令，再点击回复消息中的按钮
   - name: "MICU Cloud Media"
