@@ -29,7 +29,7 @@ bots:
     command: "/checkin"
 
   - name: "癫影"
-    username: "dianyingbalala_bot"
+    username: "madowchat_bot"
     command: "/lqd"
     
   # 需要先发命令，再点击回复消息中的按钮
