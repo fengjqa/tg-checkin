@@ -60,6 +60,7 @@ bots:
     username: "EmbyPublicBot"
     command: "/checkin"
     solve_image: true
+    image_retries: 3
     ai_provider: gemini
     timeout: 30
     delay: 3
