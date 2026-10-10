@@ -7,21 +7,62 @@ on:
     # GitHub Actions 的 cron 用 UTC 时间，且可能延迟几分钟，属正常现象
     # 如需调整时间，修改下面这行。例如北京时间 09:00 = UTC 01:00
     - cron: '17 */8 * * *'
+    # 每周一 UTC 02:17 执行周报（北京时间 10:17）
+    - cron: '17 2 * * 1'
+    # 每月 1 号 UTC 02:30 执行月报（北京时间 10:30）
+    - cron: '30 2 1 * *'
   # 支持手动触发，方便测试
   workflow_dispatch: {}
+    
 
 jobs:
+  # 判断本次触发的任务类型：daily / weekly / monthly
+  # 通过 cron 表达式匹配来判断（workflow_dispatch 默认为 daily）
   checkin:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # 导出任务类型供后续 step 使用
+    outputs:
+      report-type: ${{ steps.set-report-type.outputs.report-type }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 随机睡眠 3-15 分钟，避免每天执行时间完全一致
+      # 恢复签到历史记录（用于周报/月报）
+      # GitHub Actions 每次运行在新虚拟机上，需用 cache 持久化 history 文件
+      - name: Restore checkin history
+        id: restore-history
+        uses: actions/cache@v4
+        with:
+          path: checkin_history.json
+          key: checkin-history-placeholder
+          restore-keys: |
+            checkin-history-
+
+      - name: Determine report type
+        id: set-report-type
+        run: |
+          # GitHub Actions 没有直接提供哪个 cron 触发了 workflow
+          # 通过当前时间判断：周一触发周报，每月1号触发月报
+          DOW=$(date -u +%w)    # 0=Sunday
+          DOM=$(date -u +%-d)   # day of month without leading zero
+          EVENT="${{ github.event_name }}"
+
+          REPORT_TYPE="daily"
+          if [ "$EVENT" = "schedule" ]; then
+            if [ "$DOM" = "1" ]; then
+              REPORT_TYPE="monthly"
+            elif [ "$DOW" = "1" ]; then
+              REPORT_TYPE="weekly"
+            fi
+          fi
+          echo "report-type=$REPORT_TYPE" >> $GITHUB_OUTPUT
+          echo "本次任务类型: $REPORT_TYPE"
+
+      # 随机睡眠 3-15 分钟，避免每天执行时间完全一致（仅签到任务延迟）
       - name: Random delay
-        if: github.event_name == 'schedule'
+        if: steps.set-report-type.outputs.report-type == 'daily' && github.event_name == 'schedule'
         run: |
           SLEEP=$((RANDOM % 721 + 180))
           echo "随机等待 $SLEEP 秒（约 $((SLEEP / 60)) 分钟）"
@@ -48,7 +89,9 @@ jobs:
             echo "未配置 CONFIG_YAML，使用仓库中的 config.yaml"
           fi
 
+      # ====== 每日签到任务 ======
       - name: Run checkin
+        if: steps.set-report-type.outputs.report-type == 'daily'
         env:
           API_ID: ${{ secrets.API_ID }}
           API_HASH: ${{ secrets.API_HASH }}
@@ -78,6 +121,72 @@ jobs:
           SMTP_FROM_NAME: ${{ secrets.SMTP_FROM_NAME }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
         run: python checkin.py
+
+      # ====== 周报任务 ======
+      - name: Run weekly report
+        if: steps.set-report-type.outputs.report-type == 'weekly'
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+          NOTIFY_CHAT_ID: ${{ secrets.NOTIFY_CHAT_ID }}
+          NOTIFY_MAX_LENGTH: ${{ secrets.NOTIFY_MAX_LENGTH }}
+          # 代理配置
+          PROXY_TYPE: ${{ secrets.PROXY_TYPE }}
+          PROXY_HOST: ${{ secrets.PROXY_HOST }}
+          PROXY_PORT: ${{ secrets.PROXY_PORT }}
+          PROXY_USERNAME: ${{ secrets.PROXY_USERNAME }}
+          PROXY_PASSWORD: ${{ secrets.PROXY_PASSWORD }}
+          # 邮件通知（周报通过邮件发送）
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SSL: ${{ secrets.SMTP_SSL }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          SMTP_FROM_NAME: ${{ secrets.SMTP_FROM_NAME }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          # 可选：通过 Telegram 发送报告
+          REPORT_TELEGRAM: ${{ secrets.REPORT_TELEGRAM }}
+        run: python report.py weekly
+
+      # ====== 月报任务 ======
+      - name: Run monthly report
+        if: steps.set-report-type.outputs.report-type == 'monthly'
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          SESSION_STRING: ${{ secrets.SESSION_STRING }}
+          NOTIFY_CHAT_ID: ${{ secrets.NOTIFY_CHAT_ID }}
+          NOTIFY_MAX_LENGTH: ${{ secrets.NOTIFY_MAX_LENGTH }}
+          # 代理配置
+          PROXY_TYPE: ${{ secrets.PROXY_TYPE }}
+          PROXY_HOST: ${{ secrets.PROXY_HOST }}
+          PROXY_PORT: ${{ secrets.PROXY_PORT }}
+          PROXY_USERNAME: ${{ secrets.PROXY_USERNAME }}
+          PROXY_PASSWORD: ${{ secrets.PROXY_PASSWORD }}
+          # 邮件通知（月报通过邮件发送）
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SSL: ${{ secrets.SMTP_SSL }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          SMTP_FROM_NAME: ${{ secrets.SMTP_FROM_NAME }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          # 可选：通过 Telegram 发送报告
+          REPORT_TELEGRAM: ${{ secrets.REPORT_TELEGRAM }}
+        run: python report.py monthly
+
+      # 保存签到历史记录（签到任务会更新 history 文件）
+      - name: Save checkin history
+        if: always() && steps.set-report-type.outputs.report-type == 'daily'
+        uses: actions/cache@v4
+        with:
+          path: checkin_history.json
+          key: checkin-history-${{ github.run_id }}
+          restore-keys: |
+            checkin-history
 
       # 无论成功失败都上传日志，方便排查
       - name: Upload log

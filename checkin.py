@@ -32,6 +32,7 @@ from image_solver import (
     solve_image_captcha,
 )
 from proxy import get_proxy, proxy_info_str
+from report import append_history
 
 # ---------------------------------------------------------------------------
 # 日志配置（控制台彩色 + emoji + rich Markdown 渲染，文件纯文本去标记）
@@ -513,13 +514,27 @@ async def do_checkin(client, bot_cfg):
                             name, ai_provider or "auto", ai_model or "default",
                         )
 
-                    answer = await solve_image_captcha(
-                        image_b64, mime_type, options,
-                        provider=ai_provider, model=ai_model,
-                        debug=debug,
-                    )
+                    # AI 识别内部重试（验证码 30s 有效期内可多次尝试）
+                    # 不重新发命令，只用已下载的同一张图片重新调用 AI
+                    image_retries = bot_cfg.get("image_retries", 2)
+                    answer = None
+                    for img_attempt in range(1 + image_retries):
+                        if img_attempt > 0:
+                            wait_sec = 3 * img_attempt
+                            logger.info("\U0001f504 [%s] 图片识别第 %d 次重试（等待 %d 秒）...", name, img_attempt, wait_sec)
+                            await asyncio.sleep(wait_sec)
+
+                        answer = await solve_image_captcha(
+                            image_b64, mime_type, options,
+                            provider=ai_provider, model=ai_model,
+                            debug=debug,
+                        )
+                        if answer:
+                            break
+                        logger.warning("\u26a0\ufe0f [%s] 图片识别失败（第 %d/%d 次）", name, img_attempt + 1, 1 + image_retries)
+
                     if not answer:
-                        logger.warning("\u26a0\ufe0f [%s] 图片识别失败", name)
+                        logger.warning("\u26a0\ufe0f [%s] 图片识别 %d 次均失败，不再重试（验证码每天只能发一次）", name, 1 + image_retries)
                         result["message"] = "图片验证码识别失败"
                         return result
 
@@ -664,6 +679,9 @@ async def main():
             mark, r["name"], r["username"], r["message"],
         )
     logger.info("\U0001f4ca 总计: \u2705 %d / %d", success_count, len(results))
+
+    # ---- 保存签到记录到历史文件（供周报/月报使用）----
+    append_history(results)
 
     # ---- 可选：发送 Telegram 通知 ----
     if NOTIFY_CHAT_ID:

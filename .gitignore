@@ -8,6 +8,9 @@
 # 运行日志
 checkin.log
 
+# 签到历史记录（含每次签到结果，供周报/月报使用）
+checkin_history.json
+
 # Python
 __pycache__/
 *.py[cod]
