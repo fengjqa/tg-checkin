@@ -234,8 +234,12 @@ def append_history(results):
 # 报告生成
 # ---------------------------------------------------------------------------
 
-def _get_week_range(ref_date=None):
+def _get_week_range(ref_date=None, *, previous=False):
     """获取 ref_date 所在周的范围（周一到周日）
+
+    Args:
+        ref_date: 基准日期，默认今天
+        previous: 若为 True，返回上一周的范围（用于周报：周一触发时报上周数据）
 
     返回 (start_date, end_date)，均为 date 对象。
     """
@@ -243,23 +247,36 @@ def _get_week_range(ref_date=None):
         ref_date = datetime.now().date()
     # weekday(): 0=Monday ... 6=Sunday
     start = ref_date - timedelta(days=ref_date.weekday())
+    if previous:
+        start -= timedelta(days=7)
     end = start + timedelta(days=6)
     return start, end
 
 
-def _get_month_range(ref_date=None):
+def _get_month_range(ref_date=None, *, previous=False):
     """获取 ref_date 所在月的范围
+
+    Args:
+        ref_date: 基准日期，默认今天
+        previous: 若为 True，返回上个月的范围（用于月报：1号触发时报上月数据）
 
     返回 (start_date, end_date)，均为 date 对象。
     """
     if ref_date is None:
         ref_date = datetime.now().date()
-    start = ref_date.replace(day=1)
-    # 月末：下个月1号减1天
-    if start.month == 12:
-        end = start.replace(year=start.year + 1, month=1) - timedelta(days=1)
+    if previous:
+        # 上个月：先找到本月1号，再减1天得到上月末，然后取上个月1号
+        first_of_this_month = ref_date.replace(day=1)
+        last_of_prev_month = first_of_this_month - timedelta(days=1)
+        start = last_of_prev_month.replace(day=1)
+        end = last_of_prev_month
     else:
-        end = start.replace(month=start.month + 1) - timedelta(days=1)
+        start = ref_date.replace(day=1)
+        # 月末：下个月1号减1天
+        if start.month == 12:
+            end = start.replace(year=start.year + 1, month=1) - timedelta(days=1)
+        else:
+            end = start.replace(month=start.month + 1) - timedelta(days=1)
     return start, end
 
 
@@ -686,9 +703,11 @@ async def main():
         sys.exit(1)
 
     if report_type_arg == "weekly":
-        start_date, end_date = _get_week_range()
+        # 周报在周一触发，报告上一周（周一到周日）的数据
+        start_date, end_date = _get_week_range(previous=True)
     else:
-        start_date, end_date = _get_month_range()
+        # 月报在每月1号触发，报告上一个月的数据
+        start_date, end_date = _get_month_range(previous=True)
 
     filtered = _filter_records(records, start_date, end_date)
     logger.info("📋 生成%s: %s ~ %s，共 %d 天记录",
