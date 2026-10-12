@@ -231,9 +231,40 @@ def append_history(results):
         "total": len(results),
     }
 
-    # 避免同一天重复记录（覆盖当天已有的）
-    records = [r for r in records if r["date"] != today]
-    records.append(record)
+    # 同一天多次签到：保留信息更丰富的记录（有积分数据的优先）
+    existing = None
+    records_left = []
+    for r in records:
+        if r["date"] == today:
+            existing = r
+        else:
+            records_left.append(r)
+
+    if existing is not None:
+        # 比较新旧记录的"信息量"：
+        # 1. 成功率高的优先（说明真正签到成功而非"已签到过"）
+        # 2. 有积分数据的优先
+        def _info_score(rec):
+            score = 0
+            score += rec.get("success_count", 0) * 10
+            for bot in rec.get("bots", []):
+                pts = bot.get("points") or {}
+                if pts.get("gained") is not None:
+                    score += 5
+                if pts.get("balance") is not None:
+                    score += 5
+            return score
+
+        new_score = _info_score(record)
+        old_score = _info_score(existing)
+        if new_score > old_score:
+            records_left.append(record)
+        else:
+            records_left.append(existing)
+    else:
+        records_left.append(record)
+
+    records = records_left
     records.sort(key=lambda r: r["date"])
     save_history(records)
     logger.info("📝 签到记录已保存到 %s（共 %d 天）", HISTORY_FILE, len(records))
