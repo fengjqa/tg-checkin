@@ -26,7 +26,7 @@ logger = logging.getLogger("tg-checkin")
 
 # ---- 全局默认配置（环境变量）----
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL_DEFAULT = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL_DEFAULT = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL_DEFAULT = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -235,8 +235,8 @@ async def solve_image_captcha(
             return result
 
         # Gemini 失败时的回退策略：
-        # 1. 如果当前不是 gemini-2.0-flash，尝试用它回退（更稳定的模型）
-        fallback_model = "gemini-2.0-flash"
+        # 1. 如果当前不是 gemini-2.5-flash，尝试用它回退（更稳定的模型）
+        fallback_model = "gemini-2.5-flash"
         current_model = model or GEMINI_MODEL_DEFAULT
         if current_model != fallback_model:
             logger.warning("⚠️ Gemini(%s) 失败，尝试回退到 %s ...", current_model, fallback_model)
