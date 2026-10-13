@@ -230,7 +230,28 @@ async def solve_image_captcha(
     if provider == "openai":
         return await _solve_with_openai(image_b64, mime_type, options, model, debug)
     else:
-        return await _solve_with_gemini(image_b64, mime_type, options, model, debug)
+        result = await _solve_with_gemini(image_b64, mime_type, options, model, debug)
+        if result:
+            return result
+
+        # Gemini 失败时的回退策略：
+        # 1. 如果当前不是 gemini-2.0-flash，尝试用它回退（更稳定的模型）
+        fallback_model = "gemini-2.0-flash"
+        current_model = model or GEMINI_MODEL_DEFAULT
+        if current_model != fallback_model:
+            logger.warning("⚠️ Gemini(%s) 失败，尝试回退到 %s ...", current_model, fallback_model)
+            result = await _solve_with_gemini(image_b64, mime_type, options, fallback_model, debug)
+            if result:
+                return result
+
+        # 2. 如果配了 OpenAI Key，尝试用 OpenAI 回退
+        if OPENAI_API_KEY:
+            logger.warning("⚠️ Gemini 全部失败，尝试回退到 OpenAI ...")
+            result = await _solve_with_openai(image_b64, mime_type, options, None, debug)
+            if result:
+                return result
+
+        return None
 
 
 async def _solve_with_gemini(image_b64, mime_type, options, model=None, debug=False):
