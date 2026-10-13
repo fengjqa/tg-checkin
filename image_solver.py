@@ -230,21 +230,27 @@ async def solve_image_captcha(
     if provider == "openai":
         return await _solve_with_openai(image_b64, mime_type, options, model, debug)
     else:
-        result = await _solve_with_gemini(image_b64, mime_type, options, model, debug)
+        current_model = model or GEMINI_MODEL_DEFAULT
+        result = await _solve_with_gemini(image_b64, mime_type, options, current_model, debug)
         if result:
             return result
 
-        # Gemini 失败时的回退策略：
-        # 1. 如果当前不是 gemini-2.5-flash，尝试用它回退（更稳定的模型）
-        fallback_model = "gemini-2.5-flash"
-        current_model = model or GEMINI_MODEL_DEFAULT
-        if current_model != fallback_model:
-            logger.warning("⚠️ Gemini(%s) 失败，尝试回退到 %s ...", current_model, fallback_model)
-            result = await _solve_with_gemini(image_b64, mime_type, options, fallback_model, debug)
+        # Gemini 失败时的多级回退策略（从新到旧，稳定性递增）
+        fallback_models = [
+            "gemini-2.5-flash",        # 稳定版
+            "gemini-2.5-flash-lite",   # 更轻量，不易过载
+            "gemini-flash-latest",     # 自动指向最新可用 flash
+        ]
+        for fb_model in fallback_models:
+            if fb_model == current_model:
+                continue
+            logger.warning("⚠️ Gemini(%s) 失败，尝试回退到 %s ...", current_model, fb_model)
+            result = await _solve_with_gemini(image_b64, mime_type, options, fb_model, debug)
             if result:
                 return result
+            current_model = fb_model
 
-        # 2. 如果配了 OpenAI Key，尝试用 OpenAI 回退
+        # 所有 Gemini 模型都失败，尝试 OpenAI 回退
         if OPENAI_API_KEY:
             logger.warning("⚠️ Gemini 全部失败，尝试回退到 OpenAI ...")
             result = await _solve_with_openai(image_b64, mime_type, options, None, debug)
