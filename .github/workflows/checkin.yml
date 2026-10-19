@@ -41,12 +41,15 @@ jobs:
 
       # 恢复签到历史记录（用于周报/月报）
       # GitHub Actions 每次运行在新虚拟机上，需用 cache 持久化 history 文件
+      # 注意：key 不能是固定字符串，否则第一次保存后每次都精确命中旧缓存，
+      # 导致新数据无法保存（"Cache hit occurred on the primary key, not saving cache"）
+      # 用 restore-keys 前缀匹配恢复最新缓存，save 步骤用唯一 run_id 保存新数据
       - name: Restore checkin history
         id: restore-history
         uses: actions/cache@v4
         with:
           path: checkin_history.json
-          key: checkin-history-placeholder
+          key: checkin-history-never-hit
           restore-keys: |
             checkin-history-
 

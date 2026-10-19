@@ -236,10 +236,12 @@ async def solve_image_captcha(
             return result
 
         # Gemini 失败时的多级回退策略（从新到旧，稳定性递增）
+        # 注意：gemini-2.5-flash 和 gemini-2.5-flash-lite 已于 2026-10 下线（404），
+        # Google 推荐迁移到 gemini-3.8-flash / gemini-3.5-flash-lite
         fallback_models = [
-            "gemini-2.5-flash",        # 稳定版
-            "gemini-2.5-flash-lite",   # 更轻量，不易过载
-            "gemini-flash-latest",     # 自动指向最新可用 flash
+            "gemini-3.8-flash",       # Google 推荐的 2.5-flash 继任者
+            "gemini-3.5-flash-lite",  # Google 推荐的 2.5-flash-lite 继任者
+            "gemini-flash-latest",    # 自动指向最新可用 flash
         ]
         for fb_model in fallback_models:
             if fb_model == current_model:
