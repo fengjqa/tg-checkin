@@ -39,20 +39,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 恢复签到历史记录（用于周报/月报）
-      # GitHub Actions 每次运行在新虚拟机上，需用 cache 持久化 history 文件
-      # 注意：key 不能是固定字符串，否则第一次保存后每次都精确命中旧缓存，
-      # 导致新数据无法保存（"Cache hit occurred on the primary key, not saving cache"）
-      # 用 restore-keys 前缀匹配恢复最新缓存，save 步骤用唯一 run_id 保存新数据
-      - name: Restore checkin history
-        id: restore-history
-        uses: actions/cache@v4
-        with:
-          path: checkin_history.json
-          key: checkin-history-never-hit
-          restore-keys: |
-            checkin-history-
-
       - name: Determine report type
         id: set-report-type
         run: |
@@ -75,6 +61,33 @@ jobs:
           fi
           echo "report-type=$REPORT_TYPE" >> $GITHUB_OUTPUT
           echo "本次任务类型: $REPORT_TYPE"
+
+      # 恢复签到历史记录（用于周报/月报）
+      # GitHub Actions 每次运行在新虚拟机上，需用 cache 持久化 history 文件
+      #
+      # 关键：key 必须用唯一值（run_id），否则精确命中后 Post 阶段不会保存新数据
+      # restore-keys 前缀匹配恢复最新缓存，Post 阶段自动保存到 run_id key
+      #
+      # 重要：周报/月报的 cache key 用不同前缀（readonly-），避免被 daily 的
+      # restore-keys 匹配到（否则周报保存的旧数据会覆盖 daily 的最新数据）
+      - name: Restore checkin history
+        id: restore-history
+        if: steps.set-report-type.outputs.report-type == 'daily'
+        uses: actions/cache@v4
+        with:
+          path: checkin_history.json
+          key: checkin-history-${{ github.run_id }}
+          restore-keys: |
+            checkin-history-
+
+      - name: Restore checkin history (read-only)
+        if: steps.set-report-type.outputs.report-type != 'daily'
+        uses: actions/cache@v4
+        with:
+          path: checkin_history.json
+          key: readonly-history-${{ github.run_id }}-never
+          restore-keys: |
+            checkin-history-
 
       # 随机睡眠 3-15 分钟，避免每天执行时间完全一致（仅签到任务延迟）
       - name: Random delay
@@ -194,15 +207,10 @@ jobs:
           REPORT_TELEGRAM: ${{ secrets.REPORT_TELEGRAM }}
         run: python report.py monthly
 
-      # 保存签到历史记录（签到任务会更新 history 文件）
-      - name: Save checkin history
-        if: always() && steps.set-report-type.outputs.report-type == 'daily'
-        uses: actions/cache@v4
-        with:
-          path: checkin_history.json
-          key: checkin-history-${{ github.run_id }}
-          restore-keys: |
-            checkin-history
+      # 历史记录保存由 Restore 步骤的 Post 阶段自动处理
+      # （actions/cache@v4 在 key 未被精确命中时会自动保存）
+      # 仅在 daily 签到任务时需要保存（签到会更新 history 文件）
+      # 报告任务不需要保存，因为不会修改 history 文件
 
       # 无论成功失败都上传日志，方便排查
       - name: Upload log
