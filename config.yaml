@@ -35,7 +35,11 @@ bots:
   - name: "ZAKA AI"
     username: "zakadeep_bot"
     command: "/checkin"
-    
+
+  - name: "Muse"
+    username: "MuseCodeBoostHubBot"
+    command: "/checkin"
+
   # 需要先发命令，再点击回复消息中的按钮
   - name: "MICU Cloud Media"
     username: "micu_user_bot"
