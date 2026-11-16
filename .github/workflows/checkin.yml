@@ -43,7 +43,13 @@ jobs:
         id: set-report-type
         run: |
           # GitHub Actions 没有直接提供哪个 cron 触发了 workflow
-          # 通过当前时间判断：周一触发周报，每月1号触发月报
+          # 通过当前时间精确判断：
+          #   daily cron:  '17 */8 * * *'  → UTC 00:17, 08:17, 16:17
+          #   weekly cron: '17 2 * * 1'    → UTC 02:17 周一
+          #   monthly cron:'30 2 1 * *'    → UTC 02:30 每月1号
+          # 关键：周一 UTC 00:17/08:17/16:17 仍然是 daily，不是 weekly
+          HOUR=$(date -u +%H)
+          MIN=$(date -u +%M)
           DOW=$(date -u +%w)    # 0=Sunday
           DOM=$(date -u +%-d)   # day of month without leading zero
           EVENT="${{ github.event_name }}"
@@ -53,9 +59,11 @@ jobs:
           if [ "$EVENT" = "workflow_dispatch" ]; then
             REPORT_TYPE="${{ inputs.report_type }}"
           elif [ "$EVENT" = "schedule" ]; then
-            if [ "$DOM" = "1" ]; then
+            # 月报：每月1号 UTC 02:30（允许 ±10 分钟延迟）
+            if [ "$DOM" = "1" ] && [ "$HOUR" = "02" ] && [ "$MIN" -ge 20 ] && [ "$MIN" -le 40 ]; then
               REPORT_TYPE="monthly"
-            elif [ "$DOW" = "1" ]; then
+            # 周报：周一 UTC 02:17（允许 ±10 分钟延迟）
+            elif [ "$DOW" = "1" ] && [ "$HOUR" = "02" ] && [ "$MIN" -ge 10 ] && [ "$MIN" -le 30 ]; then
               REPORT_TYPE="weekly"
             fi
           fi
