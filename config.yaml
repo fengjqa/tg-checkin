@@ -37,7 +37,7 @@ bots:
     command: "/checkin"
 
   - name: "Muse"
-    username: "MuseCodeBoostHubBot"
+    username: "MusePromoteBot"
     command: "/checkin"
 
   # 需要先发命令，再点击回复消息中的按钮
